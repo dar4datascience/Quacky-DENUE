@@ -200,6 +200,7 @@ read_denue_data <- function(path_2_file_zip){
   
   clean_denue_data <- denue_data |> 
     select(any_of(column_names)) |> 
+    mutate(across(everything(), as.character)) |>
     mutate(
       across(
         where(is.character),
@@ -305,7 +306,7 @@ identify_denue_csv_file <- function(path_2_file_zip){
 
 # Ingest Denue Data -------------------------------------------------------
 ingest_denue_data_into_duckdb <- function(denue_zip){
-  
+  gc()
   cli::cli_inform(
     paste0("Ingesting ", denue_zip)
   )
@@ -316,6 +317,8 @@ ingest_denue_data_into_duckdb <- function(denue_zip){
   )
   
   ingest_denue_data_2_duckdb(denue_data)
+  
+  gc()
   
 }
 
