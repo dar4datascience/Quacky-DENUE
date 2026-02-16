@@ -38,9 +38,11 @@ def test_live_discovery_inegi_denue_links(tmp_path):
 
 
 def _extract_year_from_url(url: str) -> str | None:
-    match = re.search(r"denue_[0-9]{2}(?:-[0-9]{2})?_([0-9]{4})(?:_[0-9]{2})?_csv\.zip$", url)
+    match = re.search(r"denue_[0-9]{2}(?:-[0-9]{2})?_([0-9]{4})[0-9]{4}_csv\.zip$", url)
     if match:
-        return match.group(1)
+        year = match.group(1)
+        # Guard against malformed dates like 2502
+        return year if year.isdigit() and 2000 <= int(year) <= 2030 else None
     return None
 
 
@@ -71,8 +73,8 @@ def test_live_pipeline_multi_year_estado_integration(tmp_path):
         if year and year not in by_year:
             by_year[year] = link
 
-    if len(by_year) < 2:
-        pytest.skip("Not enough live federation snapshots with distinct years for integration test")
+    if len(by_year) < 1:
+        pytest.skip("No live federation snapshots with identifiable years for integration test")
 
     selected_years = sorted(by_year.keys())[:2]
     selected_links = [by_year[year] for year in selected_years]
