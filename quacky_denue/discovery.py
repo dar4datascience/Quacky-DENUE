@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from playwright.sync_api import TimeoutError, sync_playwright
 
@@ -12,12 +12,27 @@ from quacky_denue.retry import retry
 
 LOGGER = logging.getLogger(__name__)
 FEDERATION_PATTERN = re.compile(r"denue_([0-9]{1,2}(?:-[0-9]{1,2})?)_", re.IGNORECASE)
+DENUE_CSV_ZIP_PATTERN = re.compile(
+    r"/contenidos/masiva/denue/[0-9]{4}/denue_[0-9]{2}(?:-[0-9]{2})?_[0-9]{8}(?:_csv|_shp)\.zip$",
+    re.IGNORECASE,
+)
+
+
+def is_denue_csv_zip_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return bool(DENUE_CSV_ZIP_PATTERN.search(parsed.path)) and parsed.path.lower().endswith("_csv.zip")
 
 
 def _parse_federation(href: str, text: str) -> str:
+    parsed = urlparse(href)
     match = FEDERATION_PATTERN.search(href)
+    if not match:
+        match = FEDERATION_PATTERN.search(parsed.path)
     if match:
-        return match.group(1)
+        fed = match.group(1)
+        if len(fed) == 1:
+            return fed.zfill(2)
+        return fed
     return text.strip() or "unknown"
 
 
@@ -59,11 +74,14 @@ def discover_denue_links(config: PipelineConfig) -> list[DownloadLink]:
 
         for anchor in anchors:
             href = anchor.get_attribute("href")
-            if not href or not href.lower().endswith("_csv.zip"):
+            if not href:
                 continue
 
             text = anchor.inner_text().strip()
             absolute_href = urljoin(config.download_url, href)
+            if not is_denue_csv_zip_url(absolute_href):
+                continue
+
             federation = _parse_federation(absolute_href, text)
             links.append(DownloadLink(href=absolute_href, text=text, federation=federation))
 

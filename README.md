@@ -91,3 +91,24 @@ For scheduled runs (cron, systemd timer, or orchestration tool):
 1. activate environment
 2. execute `python -m quacky_denue --headless`
 3. archive the generated report for observability and audits
+
+## Testing
+
+Run the default suite (fast, no live network):
+
+```bash
+python -m pytest tests -m "not live" -v
+```
+
+Run live scraping smoke test against INEGI page (network required):
+
+```bash
+export RUN_LIVE_DENUE_TESTS=1
+python -m pytest tests/test_live_scraping.py -m live -v
+```
+
+Live tests verify:
+- links are scraped from `https://www.inegi.org.mx/app/descarga/?ti=6`
+- discovered URLs match valid DENUE zip patterns
+- federation IDs are parsed correctly for downstream filtering
+- multi-year integration for one federation works with live downloads and DuckDB writes
