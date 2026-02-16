@@ -172,3 +172,6 @@ reports/
 *.feather
 *.sqlite
 *.db
+
+# Archived legacy files
+archive/

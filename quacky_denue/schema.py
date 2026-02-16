@@ -59,7 +59,7 @@ def normalize_chunk(
     df["source_file"] = source_file
     df["federation"] = federation
     df["schema_version"] = "v1"
-    df["extraction_ts"] = pd.Timestamp.utcnow().isoformat()
+    df["extraction_ts"] = pd.Timestamp.now("UTC").isoformat()
 
     standardized = df.loc[:, list(CANONICAL_COLUMNS)].astype("string")
     return standardized, missing_required, unknown_cols
