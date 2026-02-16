@@ -163,3 +163,12 @@ cython_debug/
 *.zip
 .Rproj.user
 *.duckdb
+
+# Quacky-DENUE pipeline artifacts (heavy files)
+data/
+reports/
+*.csv
+*.parquet
+*.feather
+*.sqlite
+*.db

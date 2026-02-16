@@ -1,0 +1,4 @@
+duckdb>=1.1.0
+pandas>=2.2.0
+playwright>=1.49.0
+pyarrow>=18.0.0
