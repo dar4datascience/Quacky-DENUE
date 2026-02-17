@@ -72,6 +72,19 @@ For targeted retry runs, you can scope a run by federations:
 ./.venv/bin/python scripts/run_full_etl.py --federations 09,15
 ```
 
+Generate a retry command directly from a failed run artifact:
+
+```bash
+./.venv/bin/python scripts/build_retry_command.py \
+  --failed-files runs/<run_id>/failed_files.json
+```
+
+This prints a ready-to-run `scripts/run_full_etl.py` command, prefilled with:
+
+- inferred failed federations
+- `--max-files` defaulted to the failed entry count
+- the same storage/output defaults (customizable via flags)
+
 ## Optional login (safe retry)
 
 If the portal ever requires auth, set credentials via environment variables:
