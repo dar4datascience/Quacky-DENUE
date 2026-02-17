@@ -48,6 +48,30 @@ Optional filtering by federations:
 python -m quacky_denue --federations 09,15,31-33 --headless
 ```
 
+## Full historical ETL runner (all discovered links)
+
+Use the dedicated script when you want a run-scoped artifact folder with durable logs/reports for future retries:
+
+```bash
+./.venv/bin/python scripts/run_full_etl.py \
+  --storage-backend duckdb \
+  --duckdb-path data/denue_historical.duckdb \
+  --output-root runs
+```
+
+What it writes per run:
+
+- `runs/<run_id>/pipeline.log` (detailed progress log)
+- `runs/<run_id>/extraction_report.json` (pipeline report)
+- `runs/<run_id>/failed_files.json` (file-level failures, useful for retry planning)
+- `runs/run_history.jsonl` (append-only run summary history)
+
+For targeted retry runs, you can scope a run by federations:
+
+```bash
+./.venv/bin/python scripts/run_full_etl.py --federations 09,15
+```
+
 ## Optional login (safe retry)
 
 If the portal ever requires auth, set credentials via environment variables:

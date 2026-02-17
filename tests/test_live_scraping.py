@@ -83,9 +83,20 @@ def test_live_zip_structure_and_conjunto_csv_readability(tmp_path):
 
     with ZipFile(zip_path) as archive:
         names_lower = [name.lower() for name in archive.namelist()]
-        assert any("conjunto" in name and "datos" in name and name.endswith(".csv") for name in names_lower)
-        assert any("diccionario" in name and name.endswith(".csv") for name in names_lower)
-        assert any("metadatos" in name and name.endswith(".txt") for name in names_lower)
+        has_conjunto_csv = any(
+            "conjunto" in name and "datos" in name and name.endswith(".csv")
+            for name in names_lower
+        )
+        has_diccionario_csv = any("diccionario" in name and name.endswith(".csv") for name in names_lower)
+        has_metadatos_txt = any("metadatos" in name and name.endswith(".txt") for name in names_lower)
+        has_data_csv = any(name.endswith(".csv") and "diccionario" not in name for name in names_lower)
+
+        assert has_data_csv
+
+        # Newer packages usually include the three sections; legacy snapshots can be flat single-csv zips.
+        if has_conjunto_csv:
+            assert has_diccionario_csv
+            assert has_metadatos_txt
 
     first_chunk = next(iter_denue_chunks(zip_path, chunk_size=5_000))
     assert len(first_chunk) > 0
