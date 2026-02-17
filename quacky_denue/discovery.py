@@ -16,6 +16,7 @@ DENUE_CSV_ZIP_PATTERN = re.compile(
     r"/contenidos/masiva/denue/[0-9]{4}/denue_[0-9]{2}(?:-[0-9]{2})?_[0-9]{8}(?:_csv|_shp)\.zip$",
     re.IGNORECASE,
 )
+STATE_FILTER_PATTERN = re.compile(r"AG_([0-9]{1,2})", re.IGNORECASE)
 
 
 def is_denue_csv_zip_url(url: str) -> bool:
@@ -34,6 +35,41 @@ def _parse_federation(href: str, text: str) -> str:
             return fed.zfill(2)
         return fed
     return text.strip() or "unknown"
+
+
+def _parse_state_code(data_filter_value: str | None, data_value: str | None) -> str | None:
+    if data_value and data_value.isdigit():
+        return data_value.zfill(2)
+
+    if data_filter_value:
+        match = STATE_FILTER_PATTERN.search(data_filter_value)
+        if match:
+            return match.group(1).zfill(2)
+
+    return None
+
+
+def _collect_csv_links_for_current_view(page, config: PipelineConfig, state_code: str | None) -> list[DownloadLink]:
+    anchors = page.query_selector_all("a.aLink[href], a[href]")
+    links: list[DownloadLink] = []
+
+    for anchor in anchors:
+        href = anchor.get_attribute("href")
+        if not href:
+            continue
+
+        absolute_href = urljoin(config.download_url, href)
+        if not is_denue_csv_zip_url(absolute_href):
+            continue
+
+        text = anchor.inner_text().strip()
+        federation = _parse_federation(absolute_href, text)
+        if federation == "unknown" and state_code:
+            federation = state_code
+
+        links.append(DownloadLink(href=absolute_href, text=text, federation=federation))
+
+    return links
 
 
 def _perform_optional_login(page, config: PipelineConfig) -> None:
@@ -69,21 +105,53 @@ def discover_denue_links(config: PipelineConfig) -> list[DownloadLink]:
         page.wait_for_timeout(3_000)
         _perform_optional_login(page, config)
 
-        anchors = page.query_selector_all("a.aLink[href], a[href]")
         links: list[DownloadLink] = []
+        state_filters = page.locator("#ulAG a[data-tipofiltro='AG']")
+        state_count = state_filters.count()
 
-        for anchor in anchors:
-            href = anchor.get_attribute("href")
-            if not href:
-                continue
+        if state_count == 0:
+            LOGGER.warning("No state filter links found under #ulAG; collecting visible CSV links only")
+            links.extend(_collect_csv_links_for_current_view(page, config, state_code=None))
+        else:
+            for state_index in range(state_count):
+                state_locator = state_filters.nth(state_index)
+                state_name = (
+                    state_locator.get_attribute("data-nombreag")
+                    or state_locator.inner_text().strip()
+                    or f"index_{state_index}"
+                )
+                state_code = _parse_state_code(
+                    state_locator.get_attribute("data-filtrovalor"),
+                    state_locator.get_attribute("data-valor"),
+                )
 
-            text = anchor.inner_text().strip()
-            absolute_href = urljoin(config.download_url, href)
-            if not is_denue_csv_zip_url(absolute_href):
-                continue
+                def _click_state_once() -> None:
+                    state_locator.click(timeout=20_000)
 
-            federation = _parse_federation(absolute_href, text)
-            links.append(DownloadLink(href=absolute_href, text=text, federation=federation))
+                retry(
+                    f"click state filter {state_name}",
+                    _click_state_once,
+                    retries=3,
+                    base_delay_seconds=1.0,
+                    logger=LOGGER,
+                )
+
+                try:
+                    page.wait_for_load_state("networkidle", timeout=10_000)
+                except TimeoutError:
+                    LOGGER.debug(
+                        "Timed out waiting for networkidle after clicking state %s; continuing", state_name
+                    )
+
+                page.wait_for_timeout(750)
+                state_links = _collect_csv_links_for_current_view(page, config, state_code=state_code)
+                LOGGER.info(
+                    "Discovered %s CSV zip links for state=%s (%s)",
+                    len(state_links),
+                    state_name,
+                    state_code or "unknown",
+                )
+                links.extend(state_links)
 
         browser.close()
 

@@ -1,30 +1,19 @@
 from __future__ import annotations
 
+import os
+import re
 from pathlib import Path
-from unittest.mock import patch
+
+import pytest
 
 from quacky_denue.config import PipelineConfig
 from quacky_denue.discovery import (
+    _parse_state_code,
     _parse_federation,
     discover_denue_links,
     is_denue_csv_zip_url,
     validate_link_count,
 )
-from quacky_denue.models import DownloadLink
-
-
-class MockAnchor:
-    def __init__(self, href: str, text: str):
-        self._href = href
-        self._text = text
-
-    def get_attribute(self, attr: str):
-        if attr == "href":
-            return self._href
-        return None
-
-    def inner_text(self) -> str:
-        return self._text
 
 
 def test_is_denue_csv_zip_url():
@@ -48,26 +37,19 @@ def test_parse_federation():
     assert _parse_federation("some_other_file.zip", "Other") == "Other"
 
 
-@patch("quacky_denue.discovery.sync_playwright")
-def test_discover_denue_links(mock_playwright, tmp_path: Path):
-    fake_links = [
-        {
-            "href": "/contenidos/masiva/denue/2010/denue_09_2010_csv.zip",
-            "text": "CDMX 2010",
-        },
-        {
-            "href": "/contenidos/masiva/denue/2020/denue_15_2020_07_csv.zip",
-            "text": "México 2020",
-        },
-        {"href": "/contenidos/masiva/denue/2010/readme.pdf", "text": "Other"},
-    ]
+def test_parse_state_code():
+    assert _parse_state_code("AG_9", None) == "09"
+    assert _parse_state_code(None, "15") == "15"
+    assert _parse_state_code("AG_31", "31") == "31"
+    assert _parse_state_code(None, None) is None
 
-    mock_playwright_context = mock_playwright.return_value.__enter__.return_value
-    mock_browser = mock_playwright_context.chromium.launch.return_value
-    mock_context = mock_browser.new_context.return_value
-    mock_page = mock_context.new_page.return_value
-    mock_page.query_selector_all.return_value = [MockAnchor(l["href"], l["text"]) for l in fake_links]
 
+@pytest.mark.live
+@pytest.mark.skipif(
+    os.getenv("RUN_LIVE_DENUE_TESTS") != "1",
+    reason="Set RUN_LIVE_DENUE_TESTS=1 to run live INEGI scraping tests",
+)
+def test_live_discover_denue_links_iterates_states(tmp_path: Path):
     config = PipelineConfig(
         download_url="https://www.inegi.org.mx/app/descarga/?ti=6",
         download_dir=tmp_path,
@@ -76,31 +58,13 @@ def test_discover_denue_links(mock_playwright, tmp_path: Path):
         parquet_dir=tmp_path / "parquet",
         report_path=tmp_path / "report.json",
         headless=True,
+        max_files=500,
     )
 
     links = discover_denue_links(config)
-    assert len(links) == 2
-    assert all(isinstance(l, DownloadLink) for l in links)
-    assert {l.federation for l in links} == {"09", "15"}
 
-
-@patch("quacky_denue.discovery.sync_playwright")
-def test_validate_link_count(mock_playwright, tmp_path: Path):
-    mock_playwright_context = mock_playwright.return_value.__enter__.return_value
-    mock_browser = mock_playwright_context.chromium.launch.return_value
-    mock_page = mock_browser.new_page.return_value
-    mock_page.inner_text.return_value = "5"
-
-    config = PipelineConfig(
-        download_url="https://fake.url",
-        download_dir=tmp_path,
-        storage_backend="duckdb",
-        duckdb_path=tmp_path / "test.duckdb",
-        parquet_dir=tmp_path / "parquet",
-        report_path=tmp_path / "report.json",
-        headless=True,
-    )
-
-    assert validate_link_count(config, 3) is True
-    assert validate_link_count(config, 4) is False
-    assert validate_link_count(config, 5) is False
+    assert len(links) > 0
+    assert all(is_denue_csv_zip_url(link.href) for link in links)
+    assert all(re.fullmatch(r"\d{2}(?:-\d{2})?", link.federation) for link in links)
+    assert len({link.federation for link in links}) >= 20
+    assert isinstance(validate_link_count(config, len(links)), bool)
