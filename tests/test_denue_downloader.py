@@ -122,10 +122,13 @@ class TestDENUEDownloader:
     def test_download_retry_on_invalid_url(self, temp_cache_dir):
         downloader = DENUEDownloader(cache_dir=temp_cache_dir, max_retries=2, timeout=5)
         
+        import uuid
+        unique_id = str(uuid.uuid4())
+        
         zip_path = downloader.download_dataset(
-            "https://www.inegi.org.mx/invalid_url.zip",
-            "Test Sector",
-            "01/2025"
+            "https://www.inegi.org.mx/invalid_url_that_does_not_exist.zip",
+            f"Invalid Test Sector {unique_id}",
+            f"99/9999"
         )
         
         assert zip_path is None, "Should return None for invalid URL after retries"
