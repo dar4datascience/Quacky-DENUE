@@ -22,6 +22,7 @@ result = conn.execute("""
     SELECT "Código", "Título", "Descripción"
     FROM scian_2023
     WHERE "Código" IS NOT NULL
+      AND regexp_matches("Código", '^[0-9]+$')
     ORDER BY CAST("Código" AS INTEGER) DESC
     LIMIT 10
 """).fetchall()
