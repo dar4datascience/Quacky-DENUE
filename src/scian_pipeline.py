@@ -20,7 +20,7 @@ from scian_parser import (
 @flow(name="SCIAN ETL Pipeline", log_prints=True)
 def scian_etl_pipeline(
     url: str = INEGI_SCIAN_URL,
-    db_path: str = "scian.duckdb",
+    db_path: str = "cache/scian.duckdb",
     use_first_link: bool = True
 ) -> Dict[str, int]:
     """
