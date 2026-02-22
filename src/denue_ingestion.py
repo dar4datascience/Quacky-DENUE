@@ -114,63 +114,23 @@ class DENUEIngestion:
                                    f"Missing required columns: {missing_cols}")
                 return False
             
-            required_cols = ['id', 'periodo_consulta']
-            missing_cols = [col for col in required_cols if col not in df.columns]
-            if missing_cols:
-                logger.error(f"Missing required columns: {missing_cols}")
-                self._log_ingestion(sector, period, 0, 0, 'failed', 
-                                   f"Missing required columns: {missing_cols}")
-                return False
+            table_cols = [row[0] for row in self.conn.execute("DESCRIBE denue").fetchall()]
+            df_cols_in_table = [col for col in df.columns if col in table_cols]
             
-            logger.debug(f"Inserting {len(df.columns)} columns using BY NAME matching")
+            logger.debug(f"Inserting {len(df_cols_in_table)}/{len(df.columns)} matching columns using BY NAME")
             
             initial_count = self.conn.execute("SELECT COUNT(*) FROM denue").fetchone()[0]
             
-            self.conn.execute("""
+            df_subset = df[df_cols_in_table]
+            
+            update_cols = [col for col in df_cols_in_table if col not in ['id', 'periodo_consulta']]
+            update_list = ', '.join([f"{col} = excluded.{col}" for col in update_cols])
+            
+            self.conn.execute(f"""
                 INSERT INTO denue BY NAME
-                SELECT * FROM df
+                SELECT * FROM df_subset
                 ON CONFLICT (id, periodo_consulta) 
-                DO UPDATE SET 
-                    nom_estab = excluded.nom_estab,
-                    raz_social = excluded.raz_social,
-                    codigo_act = excluded.codigo_act,
-                    nombre_act = excluded.nombre_act,
-                    per_ocu = excluded.per_ocu,
-                    tipo_vial = excluded.tipo_vial,
-                    nom_vial = excluded.nom_vial,
-                    tipo_v_e_1 = excluded.tipo_v_e_1,
-                    nom_v_e_1 = excluded.nom_v_e_1,
-                    tipo_v_e_2 = excluded.tipo_v_e_2,
-                    nom_v_e_2 = excluded.nom_v_e_2,
-                    tipo_v_e_3 = excluded.tipo_v_e_3,
-                    nom_v_e_3 = excluded.nom_v_e_3,
-                    numero_ext = excluded.numero_ext,
-                    letra_ext = excluded.letra_ext,
-                    edificio = excluded.edificio,
-                    edificio_e = excluded.edificio_e,
-                    numero_int = excluded.numero_int,
-                    letra_int = excluded.letra_int,
-                    tipo_asent = excluded.tipo_asent,
-                    nomb_asent = excluded.nomb_asent,
-                    tipoCenCom = excluded.tipoCenCom,
-                    nom_CenCom = excluded.nom_CenCom,
-                    num_local = excluded.num_local,
-                    cod_postal = excluded.cod_postal,
-                    cve_ent = excluded.cve_ent,
-                    entidad = excluded.entidad,
-                    cve_mun = excluded.cve_mun,
-                    municipio = excluded.municipio,
-                    cve_loc = excluded.cve_loc,
-                    localidad = excluded.localidad,
-                    ageb = excluded.ageb,
-                    manzana = excluded.manzana,
-                    telefono = excluded.telefono,
-                    correoelec = excluded.correoelec,
-                    www = excluded.www,
-                    tipoUniEco = excluded.tipoUniEco,
-                    latitud = excluded.latitud,
-                    longitud = excluded.longitud,
-                    fecha_alta = excluded.fecha_alta
+                DO UPDATE SET {update_list}
             """)
             
             final_count = self.conn.execute("SELECT COUNT(*) FROM denue").fetchone()[0]
