@@ -178,3 +178,5 @@ cache/denue/
 # Archived legacy files
 archive/
 *.xlsx
+
+extraction_log.txt
