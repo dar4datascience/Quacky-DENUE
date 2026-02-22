@@ -11,6 +11,8 @@ from denue_downloader import DENUEDownloader
 from denue_parser import DENUEParser
 from denue_ingestion import DENUEIngestion
 
+Path('logs').mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',

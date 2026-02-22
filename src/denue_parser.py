@@ -54,8 +54,19 @@ class DENUEParser:
         try:
             logger.info(f"Parsing metadata from {metadatos_path.name}")
             
-            with open(metadatos_path, 'r', encoding=self.ENCODING) as f:
-                content = f.read()
+            content = None
+            for encoding in [self.ENCODING, 'utf-8', 'latin-1']:
+                try:
+                    with open(metadatos_path, 'r', encoding=encoding) as f:
+                        content = f.read()
+                    logger.debug(f"Successfully read metadata with {encoding} encoding")
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if content is None:
+                logger.error(f"Could not decode metadata file with any known encoding")
+                return metadata
             
             patterns = {
                 'identifier': r'Identificador:\s*(.+)',
