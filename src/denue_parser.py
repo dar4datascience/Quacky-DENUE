@@ -14,7 +14,11 @@ class DENUEParser:
     def __init__(self):
         pass
     
-    def parse_schema(self, diccionario_path: Path) -> Optional[List[str]]:
+    def parse_schema(self, diccionario_path: Optional[Path]) -> Optional[List[str]]:
+        if diccionario_path is None:
+            logger.info("No data dictionary provided, will infer schema from CSV")
+            return None
+        
         try:
             logger.info(f"Parsing schema from {diccionario_path.name}")
             
@@ -34,20 +38,24 @@ class DENUEParser:
             logger.error(f"Error parsing schema from {diccionario_path}: {e}")
             return None
     
-    def parse_metadata(self, metadatos_path: Path, sector: str, period: str, 
+    def parse_metadata(self, metadatos_path: Optional[Path], sector: str, period: str, 
                       download_url: str, file_size: str) -> Optional[Dict]:
+        metadata = {
+            'sector': sector,
+            'periodo_consulta': period,
+            'download_url': download_url,
+            'file_size': file_size
+        }
+        
+        if metadatos_path is None:
+            logger.info("No metadata file provided, using basic metadata")
+            return metadata
+        
         try:
             logger.info(f"Parsing metadata from {metadatos_path.name}")
             
             with open(metadatos_path, 'r', encoding=self.ENCODING) as f:
                 content = f.read()
-            
-            metadata = {
-                'sector': sector,
-                'periodo_consulta': period,
-                'download_url': download_url,
-                'file_size': file_size
-            }
             
             patterns = {
                 'identifier': r'Identificador:\s*(.+)',
@@ -70,9 +78,9 @@ class DENUEParser:
             
         except Exception as e:
             logger.error(f"Error parsing metadata from {metadatos_path}: {e}")
-            return None
+            return metadata
     
-    def parse_dataset(self, conjunto_path: Path, expected_schema: List[str]) -> Optional[pd.DataFrame]:
+    def parse_dataset(self, conjunto_path: Path, expected_schema: Optional[List[str]] = None) -> Optional[pd.DataFrame]:
         try:
             logger.info(f"Parsing dataset from {conjunto_path.name}")
             
@@ -80,13 +88,16 @@ class DENUEParser:
             
             df.columns = [self._to_snake_case(col) for col in df.columns]
             
-            missing_cols = set(expected_schema) - set(df.columns)
-            extra_cols = set(df.columns) - set(expected_schema)
-            
-            if missing_cols:
-                logger.warning(f"Missing columns in dataset: {missing_cols}")
-            if extra_cols:
-                logger.warning(f"Extra columns in dataset: {extra_cols}")
+            if expected_schema:
+                missing_cols = set(expected_schema) - set(df.columns)
+                extra_cols = set(df.columns) - set(expected_schema)
+                
+                if missing_cols:
+                    logger.warning(f"Missing columns in dataset: {missing_cols}")
+                if extra_cols:
+                    logger.warning(f"Extra columns in dataset: {extra_cols}")
+            else:
+                logger.info(f"No expected schema provided, using columns from CSV")
             
             logger.info(f"Successfully parsed dataset with {len(df)} rows and {len(df.columns)} columns")
             return df
@@ -95,12 +106,13 @@ class DENUEParser:
             logger.error(f"Error parsing dataset from {conjunto_path}: {e}")
             return None
     
-    def validate_dataset(self, df: pd.DataFrame, expected_schema: List[str]) -> Tuple[bool, List[str]]:
+    def validate_dataset(self, df: pd.DataFrame, expected_schema: Optional[List[str]] = None) -> Tuple[bool, List[str]]:
         errors = []
         
-        missing_cols = set(expected_schema) - set(df.columns)
-        if missing_cols:
-            errors.append(f"Missing required columns: {missing_cols}")
+        if expected_schema:
+            missing_cols = set(expected_schema) - set(df.columns)
+            if missing_cols:
+                errors.append(f"Missing required columns: {missing_cols}")
         
         if df.empty:
             errors.append("Dataset is empty")

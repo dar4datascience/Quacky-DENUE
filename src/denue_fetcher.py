@@ -43,10 +43,24 @@ class DENUEFetcher:
                 page.set_default_timeout(self.timeout)
                 
                 logger.info("Navigating to INEGI download page...")
-                page.goto(self.DOWNLOAD_PAGE)
+                page.goto(self.DOWNLOAD_PAGE, wait_until='networkidle')
                 
                 logger.info("Waiting for DENUE tab to load...")
                 page.wait_for_selector('#denue', state='visible', timeout=self.timeout)
+                
+                logger.info("Waiting for data rows to load...")
+                page.wait_for_selector('tr[data-agrupacion="denue"]', state='visible', timeout=self.timeout)
+                
+                logger.info("Scrolling to load all elements...")
+                previous_count = 0
+                for _ in range(5):
+                    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    page.wait_for_timeout(1000)
+                    current_count = len(page.query_selector_all('tr[data-nivel="3"][data-agrupacion="denue"]'))
+                    if current_count == previous_count and current_count > 0:
+                        break
+                    previous_count = current_count
+                    logger.debug(f"Found {current_count} rows after scrolling")
                 
                 logger.info("Extracting dataset rows...")
                 rows = page.query_selector_all('tr[data-nivel="3"][data-agrupacion="denue"]')

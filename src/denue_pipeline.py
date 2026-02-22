@@ -125,16 +125,10 @@ class DENUEPipeline:
                 })
                 return
             
+            structure_type = extracted_paths.get('structure_type', 'standard')
+            logger.info(f"Processing {structure_type} structure for {sector}")
+            
             schema = self.parser.parse_schema(extracted_paths['diccionario_de_datos'])
-            if not schema:
-                self.stats['failed_ingestions'] += 1
-                self.stats['failed_datasets'].append({
-                    'sector': sector,
-                    'periodo': period,
-                    'error': 'Schema parsing failed',
-                    'url': dataset.download_url
-                })
-                return
             
             metadata = self.parser.parse_metadata(
                 extracted_paths['metadatos'], sector, period,

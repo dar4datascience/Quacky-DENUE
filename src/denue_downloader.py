@@ -96,28 +96,37 @@ class DENUEDownloader:
         return hashlib.md5(key_string.encode()).hexdigest()
     
     def _is_already_extracted(self, extract_dir: Path) -> bool:
-        required_dirs = ['conjunto_de_datos', 'diccionario_de_datos', 'metadatos']
-        return all((extract_dir / d).exists() for d in required_dirs)
+        has_folders = all((extract_dir / d).exists() for d in ['conjunto_de_datos', 'diccionario_de_datos', 'metadatos'])
+        has_single_csv = len(list(extract_dir.glob('*.csv'))) > 0
+        return has_folders or has_single_csv
     
     def _get_extracted_paths(self, extract_dir: Path) -> Dict[str, Path]:
         conjunto = extract_dir / 'conjunto_de_datos'
         diccionario = extract_dir / 'diccionario_de_datos'
         metadatos = extract_dir / 'metadatos'
         
-        if not all([conjunto.exists(), diccionario.exists(), metadatos.exists()]):
-            logger.error(f"Missing required directories in {extract_dir}")
-            return None
+        if all([conjunto.exists(), diccionario.exists(), metadatos.exists()]):
+            conjunto_csv = next(conjunto.glob('*.csv'), None)
+            diccionario_csv = next(diccionario.glob('*.csv'), None)
+            metadatos_txt = next(metadatos.glob('*.txt'), None)
+            
+            if all([conjunto_csv, diccionario_csv, metadatos_txt]):
+                return {
+                    'conjunto_de_datos': conjunto_csv,
+                    'diccionario_de_datos': diccionario_csv,
+                    'metadatos': metadatos_txt,
+                    'structure_type': 'standard'
+                }
         
-        conjunto_csv = next(conjunto.glob('*.csv'), None)
-        diccionario_csv = next(diccionario.glob('*.csv'), None)
-        metadatos_txt = next(metadatos.glob('*.txt'), None)
+        csv_files = list(extract_dir.glob('*.csv'))
+        if csv_files:
+            logger.info(f"Found single CSV structure with {len(csv_files)} file(s)")
+            return {
+                'conjunto_de_datos': csv_files[0],
+                'diccionario_de_datos': None,
+                'metadatos': None,
+                'structure_type': 'single_csv'
+            }
         
-        if not all([conjunto_csv, diccionario_csv, metadatos_txt]):
-            logger.error(f"Missing required files in {extract_dir}")
-            return None
-        
-        return {
-            'conjunto_de_datos': conjunto_csv,
-            'diccionario_de_datos': diccionario_csv,
-            'metadatos': metadatos_txt
-        }
+        logger.error(f"Could not determine structure in {extract_dir}")
+        return None

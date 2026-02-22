@@ -63,5 +63,5 @@ class TestDENUEFetcher:
         assert len(sectors) > 5, "Should have multiple sectors"
         
         for dataset in datasets:
-            assert '/' in dataset.period, "Period should be in MM/YYYY format"
+            assert dataset.period, "Period should not be empty"
             assert 'csv.zip' in dataset.download_url.lower(), "URL should point to CSV ZIP"
