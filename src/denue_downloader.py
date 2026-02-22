@@ -24,9 +24,12 @@ class DENUEDownloader:
         cache_key = self._get_cache_key(url, sector, period)
         cached_path = self.cache_dir / f"{cache_key}.zip"
         
-        if cached_path.exists():
+        if cached_path.exists() and cached_path.stat().st_size > 0:
             logger.info(f"Using cached file for {sector} ({period}): {cached_path}")
             return cached_path
+        elif cached_path.exists():
+            logger.warning(f"Removing invalid cached file: {cached_path}")
+            cached_path.unlink()
         
         logger.info(f"Downloading {sector} ({period}) from {url}")
         
@@ -50,6 +53,8 @@ class DENUEDownloader:
                 
             except requests.exceptions.Timeout:
                 logger.warning(f"Timeout downloading {sector} (attempt {attempt}/{self.max_retries})")
+                if cached_path.exists():
+                    cached_path.unlink()
                 if attempt < self.max_retries:
                     wait_time = self.backoff_factor ** attempt
                     logger.info(f"Retrying in {wait_time} seconds...")
@@ -60,6 +65,8 @@ class DENUEDownloader:
                     
             except Exception as e:
                 logger.error(f"Error downloading {sector}: {e}")
+                if cached_path.exists():
+                    cached_path.unlink()
                 if attempt < self.max_retries:
                     wait_time = self.backoff_factor ** attempt
                     logger.info(f"Retrying in {wait_time} seconds...")
