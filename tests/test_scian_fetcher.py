@@ -45,25 +45,26 @@ class TestScianFetcher:
             assert url.startswith('http')
     
     def test_download_scian_file(self):
-        """Test downloading SCIAN XLSX file."""
+        """Test downloading SCIAN XLSX file (main classification file is always first)."""
         html_content = fetch_scian_page.fn(INEGI_SCIAN_URL)
         xlsx_links = parse_xlsx_links.fn(html_content)
         
         assert len(xlsx_links) > 0, "No .xlsx links found to download"
         
-        first_link_text, first_url = xlsx_links[0]
-        print(f"\nDownloading: {first_link_text}")
-        print(f"URL: {first_url}")
+        link_text, url = xlsx_links[0]
+        print(f"\nDownloading main SCIAN file: {link_text}")
+        print(f"URL: {url}")
         
-        file_path = download_scian_file.fn(first_url)
+        file_path = download_scian_file.fn(url)
         
         assert file_path.exists()
         assert file_path.suffix == '.xlsx'
+        assert 'categorias_y_productos' in file_path.name
         
         file_size = file_path.stat().st_size
         print(f"Downloaded file size: {file_size:,} bytes ({file_size / 1_000_000:.2f} MB)")
         
-        assert file_size > 1_000_000, f"File too small: {file_size} bytes"
+        assert file_size > 1_000_000, f"Main SCIAN file should be > 1 MB, got {file_size} bytes"
     
     def test_validate_downloaded_file(self):
         """Test validation of downloaded XLSX file."""
@@ -72,8 +73,8 @@ class TestScianFetcher:
         
         assert len(xlsx_links) > 0
         
-        first_url = xlsx_links[0][1]
-        file_path = download_scian_file.fn(first_url)
+        url = xlsx_links[0][1]
+        file_path = download_scian_file.fn(url)
         
         is_valid = validate_xlsx_file.fn(file_path)
         assert is_valid is True
@@ -88,12 +89,12 @@ class TestScianFetcher:
         if len(xlsx_links) == 0:
             pytest.skip("No .xlsx links found")
         
-        first_url = xlsx_links[0][1]
+        url = xlsx_links[0][1]
         
-        file_path_1 = download_scian_file.fn(first_url)
+        file_path_1 = download_scian_file.fn(url)
         mtime_1 = file_path_1.stat().st_mtime
         
-        file_path_2 = download_scian_file.fn(first_url)
+        file_path_2 = download_scian_file.fn(url)
         mtime_2 = file_path_2.stat().st_mtime
         
         assert file_path_1 == file_path_2

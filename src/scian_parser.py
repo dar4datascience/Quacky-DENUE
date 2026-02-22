@@ -17,6 +17,10 @@ def to_snake_case(name: str) -> str:
     Returns:
         snake_cased table name
     """
+    import unicodedata
+    
+    name = unicodedata.normalize('NFKD', name)
+    name = name.encode('ascii', 'ignore').decode('ascii')
     name = re.sub(r'[^\w\s-]', '', name)
     name = re.sub(r'[-\s]+', '_', name)
     return name.lower().strip('_')
@@ -122,9 +126,9 @@ def import_sheet_to_duckdb(
     
     headers = list(rows[0].keys())
     placeholders = ', '.join(['?' for _ in headers])
-    columns = ', '.join([f'"{h}"' for h in headers])
+    columns_def = ', '.join([f'"{h}" VARCHAR' for h in headers])
     
-    conn.execute(f"CREATE OR REPLACE TABLE {table_name} ({columns} VARCHAR)")
+    conn.execute(f"CREATE OR REPLACE TABLE {table_name} ({columns_def})")
     
     for row in rows:
         values = [row.get(h) for h in headers]

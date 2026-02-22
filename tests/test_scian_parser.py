@@ -23,14 +23,15 @@ from src.scian_parser import (
 
 @pytest.fixture(scope="module")
 def scian_file():
-    """Download SCIAN file once for all tests."""
+    """Download main SCIAN classification file once for all tests."""
     html_content = fetch_scian_page.fn(INEGI_SCIAN_URL)
     xlsx_links = parse_xlsx_links.fn(html_content)
     
     if len(xlsx_links) == 0:
         pytest.skip("No .xlsx links found on INEGI page")
     
-    file_path = download_scian_file.fn(xlsx_links[0][1])
+    url = xlsx_links[0][1]
+    file_path = download_scian_file.fn(url)
     return file_path
 
 

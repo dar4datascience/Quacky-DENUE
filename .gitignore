@@ -175,3 +175,4 @@ reports/
 
 # Archived legacy files
 archive/
+cache/*

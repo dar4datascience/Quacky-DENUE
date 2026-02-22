@@ -40,17 +40,18 @@ def fetch_scian_page(url: str = INEGI_SCIAN_URL) -> str:
 @task(name="parse_xlsx_links")
 def parse_xlsx_links(html_content: str, base_url: str = "https://www.inegi.org.mx") -> List[Tuple[str, str]]:
     """
-    Parse HTML to find all .xlsx download links.
+    Parse HTML to find all .xlsx download links, prioritizing the main SCIAN classification file.
     
     Args:
         html_content: HTML content to parse
         base_url: Base URL for resolving relative links
         
     Returns:
-        List of tuples (link_text, full_url) for all .xlsx files found
+        List of tuples (link_text, full_url) for all .xlsx files found, with main file first
     """
     soup = BeautifulSoup(html_content, 'lxml')
     xlsx_links = []
+    main_scian_link = None
     
     for link in soup.find_all('a', href=True):
         href = link['href']
@@ -62,8 +63,16 @@ def parse_xlsx_links(html_content: str, base_url: str = "https://www.inegi.org.m
             else:
                 full_url = base_url + '/' + href
             
-            link_text = link.get_text(strip=True) or "Unknown"
-            xlsx_links.append((link_text, full_url))
+            aria_label = link.get('aria-label', '')
+            link_text = link.get_text(strip=True) or aria_label or "Unknown"
+            
+            if 'categorias_y_productos' in href and 'clasificación completa' in aria_label.lower():
+                main_scian_link = (link_text, full_url)
+            else:
+                xlsx_links.append((link_text, full_url))
+    
+    if main_scian_link:
+        xlsx_links.insert(0, main_scian_link)
     
     return xlsx_links
 
@@ -93,8 +102,8 @@ def download_scian_file(url: str, output_path: Path = None) -> Path:
             f.write(chunk)
     
     file_size = output_path.stat().st_size
-    if file_size < 1_000_000:
-        raise ValueError(f"Downloaded file is too small ({file_size} bytes). Expected > 1 MB.")
+    if file_size < 10_000:
+        raise ValueError(f"Downloaded file is too small ({file_size} bytes). Expected > 10 KB.")
     
     return output_path
 
@@ -117,7 +126,7 @@ def validate_xlsx_file(file_path: Path) -> bool:
         raise ValueError(f"File is not .xlsx: {file_path}")
     
     file_size = file_path.stat().st_size
-    if file_size < 1_000_000:
-        raise ValueError(f"File is too small ({file_size} bytes). Expected > 1 MB.")
+    if file_size < 10_000:
+        raise ValueError(f"File is too small ({file_size} bytes). Expected > 10 KB.")
     
     return True
