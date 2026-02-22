@@ -95,7 +95,18 @@ class DENUEParser:
         try:
             logger.info(f"Parsing dataset from {conjunto_path.name}")
             
-            df = pd.read_csv(conjunto_path, encoding=self.ENCODING, low_memory=False)
+            df = None
+            for encoding in [self.ENCODING, 'utf-8', 'latin-1', 'cp1252']:
+                try:
+                    df = pd.read_csv(conjunto_path, encoding=encoding, low_memory=False)
+                    logger.debug(f"Successfully read CSV with {encoding} encoding")
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if df is None:
+                logger.error(f"Could not decode CSV file with any known encoding")
+                return None
             
             df.columns = [self._to_snake_case(col) for col in df.columns]
             
