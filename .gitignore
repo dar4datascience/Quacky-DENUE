@@ -167,6 +167,8 @@ cython_debug/
 # Quacky-DENUE pipeline artifacts (heavy files)
 data/
 reports/
+logs/
+cache/denue/
 *.csv
 *.parquet
 *.feather

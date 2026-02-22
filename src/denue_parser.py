@@ -1,0 +1,123 @@
+import logging
+import re
+import json
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+
+class DENUEParser:
+    ENCODING = 'ISO-8859-3'
+    
+    def __init__(self):
+        pass
+    
+    def parse_schema(self, diccionario_path: Path) -> Optional[List[str]]:
+        try:
+            logger.info(f"Parsing schema from {diccionario_path.name}")
+            
+            df = pd.read_csv(diccionario_path, encoding=self.ENCODING, skiprows=1)
+            
+            if 'Nombre del Atributo en csv' not in df.columns:
+                logger.error(f"Column 'Nombre del Atributo en csv' not found in {diccionario_path}")
+                return None
+            
+            columns = df['Nombre del Atributo en csv'].dropna().tolist()
+            columns = [self._to_snake_case(col) for col in columns]
+            
+            logger.info(f"Parsed {len(columns)} columns from schema")
+            return columns
+            
+        except Exception as e:
+            logger.error(f"Error parsing schema from {diccionario_path}: {e}")
+            return None
+    
+    def parse_metadata(self, metadatos_path: Path, sector: str, period: str, 
+                      download_url: str, file_size: str) -> Optional[Dict]:
+        try:
+            logger.info(f"Parsing metadata from {metadatos_path.name}")
+            
+            with open(metadatos_path, 'r', encoding=self.ENCODING) as f:
+                content = f.read()
+            
+            metadata = {
+                'sector': sector,
+                'periodo_consulta': period,
+                'download_url': download_url,
+                'file_size': file_size
+            }
+            
+            patterns = {
+                'identifier': r'Identificador:\s*(.+)',
+                'title': r'Título:\s*(.+)',
+                'description': r'Descripción:\s*(.+)',
+                'modified': r'Fecha de actualización:\s*(.+)',
+                'publisher': r'Publicador:\s*(.+)',
+                'temporal': r'Cobertura temporal:\s*(.+)',
+                'spatial': r'Cobertura espacial:\s*(.+)',
+                'accrual_periodicity': r'Frecuencia de actualización:\s*(.+)'
+            }
+            
+            for key, pattern in patterns.items():
+                match = re.search(pattern, content)
+                if match:
+                    metadata[key] = match.group(1).strip()
+            
+            logger.info(f"Successfully parsed metadata")
+            return metadata
+            
+        except Exception as e:
+            logger.error(f"Error parsing metadata from {metadatos_path}: {e}")
+            return None
+    
+    def parse_dataset(self, conjunto_path: Path, expected_schema: List[str]) -> Optional[pd.DataFrame]:
+        try:
+            logger.info(f"Parsing dataset from {conjunto_path.name}")
+            
+            df = pd.read_csv(conjunto_path, encoding=self.ENCODING, low_memory=False)
+            
+            df.columns = [self._to_snake_case(col) for col in df.columns]
+            
+            missing_cols = set(expected_schema) - set(df.columns)
+            extra_cols = set(df.columns) - set(expected_schema)
+            
+            if missing_cols:
+                logger.warning(f"Missing columns in dataset: {missing_cols}")
+            if extra_cols:
+                logger.warning(f"Extra columns in dataset: {extra_cols}")
+            
+            logger.info(f"Successfully parsed dataset with {len(df)} rows and {len(df.columns)} columns")
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error parsing dataset from {conjunto_path}: {e}")
+            return None
+    
+    def validate_dataset(self, df: pd.DataFrame, expected_schema: List[str]) -> Tuple[bool, List[str]]:
+        errors = []
+        
+        missing_cols = set(expected_schema) - set(df.columns)
+        if missing_cols:
+            errors.append(f"Missing required columns: {missing_cols}")
+        
+        if df.empty:
+            errors.append("Dataset is empty")
+        
+        is_valid = len(errors) == 0
+        return is_valid, errors
+    
+    def _to_snake_case(self, text: str) -> str:
+        text = text.strip()
+        text = re.sub(r'[áàäâ]', 'a', text, flags=re.IGNORECASE)
+        text = re.sub(r'[éèëê]', 'e', text, flags=re.IGNORECASE)
+        text = re.sub(r'[íìïî]', 'i', text, flags=re.IGNORECASE)
+        text = re.sub(r'[óòöô]', 'o', text, flags=re.IGNORECASE)
+        text = re.sub(r'[úùüû]', 'u', text, flags=re.IGNORECASE)
+        text = re.sub(r'ñ', 'n', text, flags=re.IGNORECASE)
+        text = re.sub(r'[^a-zA-Z0-9]+', '_', text)
+        text = text.lower()
+        text = re.sub(r'_+', '_', text)
+        text = text.strip('_')
+        return text
